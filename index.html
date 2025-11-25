@@ -124,6 +124,15 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* Time Turner Spin */
+        .spin-reverse {
+            animation: spin-reverse 4s linear infinite;
+        }
+        @keyframes spin-reverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
     </style>
 </head>
 <body>
@@ -374,7 +383,7 @@
             }
         ];
 
-        // --- Data: Landmarks (For Navigation Only) ---
+        // --- Data: Landmarks ---
         const LANDMARKS_DATA = [
             // Universal Studios Florida (Diagon Alley)
             { id: 'L1', title: 'The Leaky Cauldron', park: 'USF', lat: 28.4802, lng: -81.4712 },
@@ -409,6 +418,19 @@
         ];
 
         // --- Helper Functions ---
+        function decimalToTime(decimal) {
+            let hours = Math.floor(decimal);
+            const minutes = Math.round((decimal - hours) * 60);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            
+            // Standard 12-hour format
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            
+            const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${strMinutes} ${ampm}`;
+        }
+
         function getDistanceFromLatLonInYards(lat1, lon1, lat2, lon2) {
             var R = 6371; 
             var dLat = deg2rad(lat2 - lat1);
@@ -482,7 +504,7 @@
             </div>
         );
 
-        const ItemCard = ({ item, userLoc, isCompleted, onToggle, showDist, theme, isActive, id }) => {
+        const ItemCard = ({ item, userLoc, isCompleted, onToggle, showDist, theme, isActive, id, overrideTime }) => {
             const [justChecked, setJustChecked] = useState(false);
 
             const getIcon = (type) => {
@@ -512,6 +534,9 @@
             const parkBg = isUSF ? 'bg-blue-800' : (isIOA ? 'bg-green-800' : 'bg-gray-700');
             const parkLabel = isUSF ? 'Universal Studios' : (isIOA ? 'Islands of Adv.' : item.park);
             const navInfo = (showDist && userLoc) ? formatDistanceInfo(userLoc, item.lat, item.lng) : null;
+
+            // Use the Time-Turner override time if available, otherwise default
+            const displayTime = overrideTime || item.time;
 
             return (
                 <div 
@@ -584,7 +609,14 @@
                         ) : (
                             <div className="flex justify-between items-center mb-1">
                                 <p className="text-base text-gray-400 font-semibold">{item.location}</p>
-                                <span className={`font-mono text-sm whitespace-nowrap ${theme.accent}`}>{item.time}</span>
+                                <span className={`font-mono text-sm whitespace-nowrap ${theme.accent}`}>
+                                    {/* Show original time crossed out if override exists */}
+                                    {overrideTime ? (
+                                        <span><span className="line-through opacity-50 mr-2">{item.time}</span>{overrideTime}</span>
+                                    ) : (
+                                        item.time
+                                    )}
+                                </span>
                             </div>
                         )}
                        
@@ -609,14 +641,10 @@
             const [search, setSearch] = useState('');
             const [isOpen, setIsOpen] = useState(false);
 
-            // Combine itinerary items + extra landmarks for search
-            // Use a Map to deduplicate by title just in case
             const allOptions = useMemo(() => {
                 const combined = [...ITINERARY_DATA, ...LANDMARKS_DATA];
-                // Simple dedupe logic: keep the first one found with a given title
                 const unique = [];
                 const seen = new Set();
-                
                 combined.forEach(item => {
                     if (!seen.has(item.title)) {
                         unique.push(item);
@@ -678,8 +706,8 @@
             const [house, setHouse] = useState('gryffindor');
             const [currentTime, setCurrentTime] = useState(new Date());
             const [showFinale, setShowFinale] = useState(false);
-            
             const [manualLoc, setManualLoc] = useState(null);
+            const [timeTurnerActive, setTimeTurnerActive] = useState(false);
 
             const theme = HOUSES[house];
 
@@ -715,6 +743,33 @@
 
             const displayedItems = useMemo(() => {
                 let items = [...ITINERARY_DATA];
+                
+                // TIME TURNER LOGIC
+                if (view === 'schedule' && timeTurnerActive) {
+                    // Find first uncompleted item
+                    const firstUncheckedIdx = items.findIndex(i => !completedItems.includes(i.id));
+                    
+                    if (firstUncheckedIdx !== -1) {
+                        const targetItem = items[firstUncheckedIdx];
+                        // Calculate shift: Difference between Current Time and Planned Time
+                        // We want the target item to start NOW.
+                        const shift = currentHour - targetItem.startHour;
+                        
+                        // Apply shift to all items from this index onwards
+                        items = items.map((item, idx) => {
+                            if (idx >= firstUncheckedIdx) {
+                                const newStart = item.startHour + shift;
+                                // Clone item to avoid mutating original const data
+                                return {
+                                    ...item,
+                                    overrideTime: decimalToTime(newStart) // Pre-calc string for display
+                                };
+                            }
+                            return item;
+                        });
+                    }
+                }
+
                 if (view === 'alphabetical') {
                     items.sort((a, b) => a.title.localeCompare(b.title));
                 } else if (view === 'nearby') {
@@ -728,7 +783,7 @@
                     }
                 }
                 return items;
-            }, [view, manualLoc]);
+            }, [view, manualLoc, timeTurnerActive, currentHour, completedItems]);
 
             const progressPercentage = Math.round((completedItems.length / ITINERARY_DATA.length) * 100);
 
@@ -790,6 +845,23 @@
 
                     <main className="p-4 max-w-2xl mx-auto">
                         
+                        {/* Time Turner Button (Schedule View Only) */}
+                        {view === 'schedule' && (
+                            <button 
+                                onClick={() => setTimeTurnerActive(!timeTurnerActive)}
+                                className={`w-full mb-6 py-3 rounded-lg border-2 flex items-center justify-center gap-3 transition-all duration-500 ${
+                                    timeTurnerActive 
+                                    ? 'bg-yellow-900/80 border-yellow-500 text-yellow-200 shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
+                                    : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'
+                                }`}
+                            >
+                                <Icon name="hourglass" size={20} className={timeTurnerActive ? 'spin-reverse text-yellow-400' : ''} />
+                                <span className="font-magic font-bold tracking-widest uppercase">
+                                    {timeTurnerActive ? "Time Turner Active" : "Use Time Turner"}
+                                </span>
+                            </button>
+                        )}
+
                         {view === 'nearby' && (
                             <>
                                 <ManualLocationSelector 
@@ -826,6 +898,7 @@
                                         onToggle={toggleComplete}
                                         theme={theme}
                                         isActive={isActive}
+                                        overrideTime={item.overrideTime}
                                     />
                                 );
                             })}
