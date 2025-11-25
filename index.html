@@ -379,7 +379,7 @@
             {
                 id: 12,
                 time: "1:00 PM",
-                startHour: 13.0, endHour: 13.66,
+                startHour: 13.0, endHour: 13.5,
                 title: "Diagon Alley Shows & Shopping",
                 location: "Diagon Alley",
                 park: "USF",
@@ -392,8 +392,24 @@
             },
             {
                 id: 13,
-                time: "1:40 PM",
-                startHour: 13.66, endHour: 13.91,
+                time: "1:30 PM",
+                startHour: 13.5, endHour: 14.0,
+                title: "Escape from Gringotts",
+                location: "Gringotts Bank",
+                park: "USF",
+                heightReq: "42\"",
+                hasExpress: true,
+                description: "Enter the marble hall of Gringotts and journey deep underground. Watch out for Voldemort and Bellatrix!",
+                lat: 28.4803,
+                lng: -81.4702,
+                url: "https://www.universalorlando.com/web/en/us/things-to-do/rides-attractions/harry-potter-and-the-escape-from-gringotts",
+                mapQuery: "Harry Potter and the Escape from Gringotts",
+                type: "ride"
+            },
+            {
+                id: 14,
+                time: "2:00 PM",
+                startHour: 14.0, endHour: 14.25,
                 title: "Florean Fortescue's Ice-Cream",
                 location: "Florean Fortescue's",
                 park: "USF",
@@ -405,9 +421,9 @@
                 type: "dining"
             },
             {
-                id: 14,
-                time: "1:55 PM",
-                startHour: 13.91, endHour: 14.5,
+                id: 15,
+                time: "2:15 PM",
+                startHour: 14.25, endHour: 14.75,
                 title: "Exit Park",
                 location: "USF Exit",
                 park: "Logistics",
@@ -876,8 +892,6 @@
                     }
                 }
 
-                // Sort for Alphabetical/Nearby, but for Schedule we keep ID order (implied chronological)
-                // NOTE: For active logic to work best, we need chronological order.
                 if (view === 'alphabetical') {
                     items.sort((a, b) => a.title.localeCompare(b.title));
                 } else if (view === 'nearby') {
@@ -896,7 +910,6 @@
             // 2. Calculate Active Item based on GAP logic
             // We must use the *chronological* list for this logic
             const activeItemId = useMemo(() => {
-                // Filter for schedule view logic, or just use original order
                 const chronoItems = [...displayedItems].sort((a, b) => a.id - b.id);
                 
                 for (let i = 0; i < chronoItems.length; i++) {
@@ -1025,7 +1038,7 @@
 
                         <div className="space-y-6 pb-20">
                             {displayedItems.map((item, index) => {
-                                const isActive = activeItemId === item.id;
+                                const isActive = activeItemId === item.id && view === 'schedule';
                                 
                                 return (
                                     <div key={item.id}>
@@ -1071,5 +1084,3 @@
     </script>
 </body>
 </html>
-
-
